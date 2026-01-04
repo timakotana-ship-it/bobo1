@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stash | Казино</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.9.6/lottie.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Контейнер для уведомлений -->
+    <div id="toastContainer"></div>
+
+    <!-- Прелоадер -->
+    <div id="preloader">
+        <div class="preloader-content">
+            <div class="preloader-spinner"></div>
+            <div class="preloader-text">Stash</div>
+        </div>
+    </div>
+
+    <!-- Модальное окно поиска -->
+    <div id="searchOverlay"></div>
+    <div id="searchModal">
+        <div class="search-modal-header">
+            <div class="search-modal-title">Поиск игр</div>
+            <button class="search-modal-close" onclick="closeSearchModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="search-modal-content">
+            <div class="search-modal-input-container">
+                <input type="text" 
+                       id="searchModalInput" 
+                       placeholder="Введите название игры..."
+                       oninput="performModalSearch()">
+                <div class="search-modal-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+            </div>
+            
+            <div class="search-games-grid" id="searchGamesGrid">
+                <!-- Игры будут загружены через JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно кошелька -->
+    <div id="walletOverlay"></div>
+    <div id="walletModal">
+        <div class="wallet-header">
+            <button class="wallet-back-btn" id="walletBackBtn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="wallet-title">Кошелек</div>
+            <button class="wallet-close-btn" id="closeWalletBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="wallet-content">
+            <!-- Главный экран кошелька -->
+            <div id="walletMain">
+                <div class="wallet-tabs">
+                    <button class="wallet-tab-btn active" data-tab="deposit">
+                        Депозит
+                    </button>
+                    <button class="wallet-tab-btn" data-tab="withdraw">
+                        Вывод
+                    </button>
+                    <button class="wallet-tab-btn" data-tab="history">
+                        История
+                    </button>
+                </div>
+                
+                <!-- Вкладка депозита -->
+                <div id="depositTab" class="wallet-tab-content active">
+                    <div class="crypto-banner">
+                        <img src="images/banner2.png" alt="Crypto">
+                        <div class="crypto-banner-text">
+                            Получите бонус за первый депозит криптовалютой
+                        </div>
+                    </div>
+                    
+                    <div class="crypto-currency-label">Криптовалюта</div>
+                    
+                    <button class="crypto-currency-button" onclick="openDepositDetails()">
+                        <div class="crypto-button-left">
+                            <div class="crypto-button-icon">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <div class="crypto-button-text">
+                                <div class="crypto-button-title">USDT</div>
+                                <div class="crypto-button-subtitle">
+                                    <span>Пополнить баланс</span>
+                                    <div class="crypto-button-badge">
+                                        <i class="fas fa-gift"></i>
+                                        Бонус
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="crypto-button-image">
+                            <div class="usdt-icon">USDT</div>
+                        </div>
+                    </button>
+                </div>
+                
+                <!-- Вкладка вывода -->
+                <div id="withdrawTab" class="wallet-tab-content">
+                    <div class="crypto-banner">
+                        <img src="images/banner2.png" alt="Crypto">
+                    </div>
+                    
+                    <div class="balance-display">
+                        <div class="balance-label">Ваш баланс:</div>
+                        <div class="balance-amount-large" id="withdrawBalanceAmount">
+                            0.00$
+                        </div>
+                    </div>
+                    
+                    <div class="crypto-currency-label">Вывести на</div>
+                    
+                    <button class="crypto-currency-button" onclick="openWithdrawDetails()">
+                        <div class="crypto-button-left">
+                            <div class="crypto-button-icon">
+                                <i class="fas fa-wallet"></i>
+                            </div>
+                            <div class="crypto-button-text">
+                                <div class="crypto-button-title">USDT</div>
+                                <div class="crypto-button-subtitle">
+                                    <span>Вывод средств</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="crypto-button-image">
+                            <div class="usdt-icon">USDT</div>
+                        </div>
+                    </button>
+                </div>
+                
+                <!-- Вкладка истории -->
+                <div id="historyTab" class="wallet-tab-content">
+                    <div class="wallet-history-list" id="walletHistoryList">
+                        <!-- История будет здесь -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Детали депозита -->
+            <div id="walletDepositDetails" style="display: none;">
+                <div class="details-title">Криптовалютный депозит</div>
+                
+                <div class="payment-method-selector">
+                    <button class="payment-method-btn active" data-method="cryptobot">
+                        <i class="fas fa-robot"></i> CryptoBot
+                    </button>
+                    <button class="payment-method-btn" data-method="xrocket">
+                        <i class="fas fa-rocket"></i> xRocket
+                    </button>
+                </div>
+                
+                <input type="number" 
+                       class="crypto-amount-input" 
+                       id="depositCryptoAmount"
+                       value="0.50"
+                       min="0.50"
+                       step="0.10"
+                       placeholder="Сумма депозита">
+                
+                <div class="crypto-minimum">
+                    Минимальный депозит: 0.50$
+                </div>
+                
+                <button class="game-button" id="createDepositBtn">
+                    Создать счет на оплату
+                </button>
+            </div>
+            
+            <!-- Детали вывода -->
+            <div id="walletWithdrawDetails" style="display: none;">
+                <div class="details-title">Вывод средств</div>
+                
+                <div class="payment-method-selector">
+                    <button class="payment-method-btn active" data-method="cryptobot">
+                        <i class="fas fa-robot"></i> CryptoBot
+                    </button>
+                    <button class="payment-method-btn" data-method="xrocket">
+                        <i class="fas fa-rocket"></i> xRocket
+                    </button>
+                </div>
+                
+                <input type="number" 
+                       class="crypto-amount-input" 
+                       id="withdrawCryptoAmount"
+                       value="2.00"
+                       min="2.00"
+                       step="0.01"
+                       placeholder="Сумма вывода">
+                
+                <div class="crypto-minimum">
+                    Минимальный вывод: 2.00$
+                </div>
+                
+                <button class="game-button" id="createWithdrawBtn">
+                    Подать заявку на вывод
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Bar для мобильных -->
+    <div class="top-bar">
+        <div class="logo">
+            <img src="images/logo.png" alt="Stash" class="logo-image">
+        </div>
+        
+        <div class="profile-info">
+            <div class="balance-info">
+                <span class="balance-amount" id="userBalance">0.00$</span>
+                <button class="add-balance-btn" onclick="openWalletModal()">+</button>
+            </div>
+            
+            <div class="profile-avatar" id="userAvatar" onclick="showPage('profilePage')">
+                <i class="fas fa-user"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Боковая навигация для ПК -->
+    <div class="side-nav" id="sideNav">
+        <div class="nav-section">
+            <button class="side-nav-item active" onclick="showPage('mainPage')">
+                <div class="nav-icon">
+                    <i class="fas fa-gamepad"></i>
+                </div>
+                <div class="nav-text">Игры</div>
+            </button>
+            
+            <button class="side-nav-item" onclick="showPage('bonusPage')">
+                <div class="nav-icon">
+                    <i class="fas fa-gift"></i>
+                </div>
+                <div class="nav-text">Бонусы</div>
+            </button>
+            
+            <button class="side-nav-item" onclick="openWalletModal()">
+                <div class="nav-icon">
+                    <i class="fas fa-wallet"></i>
+                </div>
+                <div class="nav-text">Кошелек</div>
+            </button>
+            
+            <button class="side-nav-item" onclick="showPage('profilePage')">
+                <div class="nav-icon">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="nav-text">Профиль</div>
+            </button>
+            
+            <button class="side-nav-item" onclick="openTelegramChat()">
+                <div class="nav-icon">
+                    <i class="fas fa-comment"></i>
+                </div>
+                <div class="nav-text">Чат</div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Нижняя навигация для мобильных -->
+    <div class="bottom-nav">
+        <button class="bottom-nav-item active" onclick="showPage('mainPage')">
+            <div class="nav-icon">
+                <i class="fas fa-gamepad"></i>
+            </div>
+            <div class="nav-text">Игры</div>
+        </button>
+        
+        <button class="bottom-nav-item" onclick="showPage('bonusPage')">
+            <div class="nav-icon">
+                <i class="fas fa-gift"></i>
+            </div>
+            <div class="nav-text">Бонусы</div>
+        </button>
+        
+        <button class="bottom-nav-item" onclick="openWalletModal()">
+            <div class="nav-icon">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <div class="nav-text">Кошелек</div>
+        </button>
+        
+        <button class="bottom-nav-item" onclick="showPage('profilePage')">
+            <div class="nav-icon">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="nav-text">Профиль</div>
+        </button>
+    </div>
+
+    <!-- Main Page -->
+    <div class="main-content active" id="mainPage">
+        <div class="main-page-layout">
+            <!-- Главный баннер -->
+            <div class="main-banner">
+                <img src="images/banner-main.png" alt="Акция">
+            </div>
+
+            <!-- Мини баннеры -->
+            <div class="mini-banners">
+                <div class="mini-banner">
+                    <img src="images/mini-banner1.png" alt="Бонус">
+                </div>
+                <div class="mini-banner">
+                    <img src="images/mini-banner2.png" alt="Джекпот">
+                </div>
+                <div class="mini-banner">
+                    <img src="images/mini-banner3.png" alt="Турнир">
+                </div>
+            </div>
+        </div>
+
+        <!-- Поиск и фильтры -->
+        <div class="search-filters">
+            <button class="search-btn" onclick="openSearchModal()">
+                <i class="fas fa-search"></i>
+            </button>
+            
+            <div class="divider"></div>
+            
+            <button class="filter-btn active" onclick="showAllGames()">
+                <i class="fas fa-th"></i>
+                <span>Все игры</span>
+            </button>
+            
+            <button class="filter-btn" onclick="filterGames('slots')">
+                <i class="fas fa-cherry"></i>
+                <span>Слоты</span>
+            </button>
+            
+            <div class="divider"></div>
+            
+            <button class="filter-btn" onclick="filterGames('live')">
+                <i class="fas fa-broadcast-tower"></i>
+                <span>Live игры</span>
+            </button>
+        </div>
+
+        <!-- Популярные игры -->
+        <div class="section-title">Популярные</div>
+        
+        <div class="games-grid">
+            <div class="game-banner" onclick="openGame('dice')">
+                <img src="images/game-dice.png" alt="Кости">
+            </div>
+            
+            <div class="game-banner" onclick="openGame('mines')">
+                <img src="images/game-mines.png" alt="Мины">
+            </div>
+            
+            <div class="game-banner" onclick="openGame('x50')">
+                <img src="images/game-x50.png" alt="X50">
+            </div>
+            
+            <div class="game-banner" onclick="openGame('crash')">
+                <img src="images/game-crash.png" alt="Crash">
+            </div>
+            
+            <div class="game-banner" onclick="openGame('tower')">
+                <img src="images/game-tower.png" alt="Башня">
+            </div>
+            
+            <div class="game-banner" onclick="openGame('plinko')">
+                <img src="images/game-plinko.png" alt="Плинко">
+            </div>
+        </div>
+    </div>
+
+    <!-- Страница игры в кости -->
+    <div class="main-content" id="dicePage">
+        <div class="game-header">
+            <button class="back-button" onclick="backToMain()">
+                <i class="fas fa-arrow-left"></i> Назад
+            </button>
+            <div class="game-title">Кости</div>
+        </div>
+        
+        <div class="dice-game-container">
+            <div class="dice-display-large">
+                <div id="diceAnimation" style="display: none;"></div>
+                <img src="images/dice.svg" alt="Кости" id="diceImage">
+            </div>
+
+            <button class="game-button" onclick="placeDiceBet()" id="placeBetBtn">
+                Сделать ставку
+            </button>
+
+            <div class="bet-control">
+                <div class="amount-label">Сумма ставки</div>
+                <div class="amount-input-group">
+                    <div class="currency-symbol">$</div>
+                    <input type="number" 
+                           class="amount-input" 
+                           id="betAmount"
+                           value="0.05"
+                           min="0.05"
+                           step="0.01"
+                           oninput="updateDiceBet()">
+                </div>
+                
+                <div class="amount-buttons">
+                    <button class="amount-btn" onclick="setMinBet()">Min</button>
+                    <button class="amount-btn" onclick="setMaxBet()">Max</button>
+                </div>
+            </div>
+
+            <div class="outcome-selection">
+                <div class="outcome-title">Выберите исход</div>
+                
+                <div class="outcome-grid">
+                    <button class="outcome-btn" onclick="selectOutcome('less')">Меньше 4 (2x)</button>
+                    <button class="outcome-btn" onclick="selectOutcome('greater')">Больше 3 (2x)</button>
+                    <button class="outcome-btn" onclick="selectOutcome('even')">Четное (2x)</button>
+                    <button class="outcome-btn" onclick="selectOutcome('odd')">Нечетное (2x)</button>
+                </div>
+                
+                <div class="number-grid">
+                    <button class="number-btn" onclick="selectOutcome('1')">1 (6x)</button>
+                    <button class="number-btn" onclick="selectOutcome('2')">2 (6x)</button>
+                    <button class="number-btn" onclick="selectOutcome('3')">3 (6x)</button>
+                    <button class="number-btn" onclick="selectOutcome('4')">4 (6x)</button>
+                    <button class="number-btn" onclick="selectOutcome('5')">5 (6x)</button>
+                    <button class="number-btn" onclick="selectOutcome('6')">6 (6x)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Страница игры в мины -->
+    <div class="main-content" id="minesPage">
+        <div class="game-header">
+            <button class="back-button" onclick="backToMain()">
+                <i class="fas fa-arrow-left"></i> Назад
+            </button>
+            <div class="game-title">Мины</div>
+        </div>
+        
+        <div class="mines-game-container">
+            <!-- Отображение множителей -->
+            <div class="multiplier-display">
+                <div class="multiplier-item">
+                    <span class="multiplier-label">Текущий</span>
+                    <span class="multiplier-value" id="currentMultiplier">1.00x</span>
+                </div>
+                <div class="multiplier-item">
+                    <span class="multiplier-label">Следующий</span>
+                    <span class="multiplier-value" id="nextMultiplier">1.20x</span>
+                </div>
+            </div>
+
+            <!-- Игровое поле 5x5 -->
+            <div class="mines-field-container">
+                <div class="mines-field" id="minesField">
+                    <!-- Заполнится через JS -->
+                </div>
+            </div>
+
+            <!-- Управление ставкой -->
+            <div class="mines-bet-control">
+                <div class="mines-bet-label">Сумма ставки</div>
+                <div class="amount-input-group">
+                    <div class="currency-symbol">$</div>
+                    <input type="number" 
+                           class="amount-input" 
+                           id="minesBetAmount"
+                           value="0.05"
+                           min="0.05"
+                           step="0.01"
+                           oninput="updateMinesBet()">
+                </div>
+                
+                <div class="amount-buttons">
+                    <button class="amount-btn" onclick="setMinesMinBet()">Min</button>
+                    <button class="amount-btn" onclick="setMinesMaxBet()">Max</button>
+                </div>
+            </div>
+
+            <!-- Выбор количества мин -->
+            <div class="mines-selector">
+                <div class="mines-count-label">Количество мин</div>
+                <div class="mines-slider-container">
+                    <input type="range" 
+                           class="mines-slider" 
+                           id="minesSlider" 
+                           min="2" 
+                           max="24" 
+                           value="2" 
+                           oninput="updateMinesSlider(this.value)">
+                    <div class="mines-count-value" id="minesValue">2 мины</div>
+                </div>
+            </div>
+
+            <!-- Кнопки действий -->
+            <div class="mines-action-buttons">
+                <button class="mines-start-btn" id="startMinesBtn" onclick="startMinesGame()">
+                    Начать игру
+                </button>
+                <button class="mines-cashout-btn" id="cashoutMinesBtn" onclick="cashoutMines()">
+                    Забрать <span id="cashoutAmount">0.00$</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Страница игры X50 -->
+    <div class="main-content" id="x50Page">
+        <div class="game-header">
+            <button class="back-button" onclick="backToMain()">
+                <i class="fas fa-arrow-left"></i> Назад
+            </button>
+            <div class="game-title">X50</div>
+        </div>
+        
+        <div class="x50-game-container">
+            <!-- Рулетка -->
+            <div class="x50-wheel-container">
+                <div class="x50-wheel-wrapper">
+                    <img src="images/wheel-fixed.png" alt="Рулетка" class="x50-wheel" id="x50Wheel">
+                    <div class="x50-arrow" id="x50Arrow">
+                        <i class="fas fa-caret-up"></i>
+                    </div>
+                    <div class="x50-result" id="x50Result"></div>
+                </div>
+                
+                <!-- Таймер раунда -->
+                <div class="x50-timer-container">
+                    <div class="x50-timer-label">До окончания ставок:</div>
+                    <div class="x50-timer" id="x50Timer">15 сек</div>
+                </div>
+            </div>
+
+            <!-- Управление ставкой -->
+            <div class="mines-bet-control">
+                <div class="mines-bet-label">Ваша ставка</div>
+                <div class="amount-input-group">
+                    <div class="currency-symbol">$</div>
+                    <input type="number" 
+                           class="amount-input" 
+                           id="x50BetAmount"
+                           value="0.05"
+                           min="0.05"
+                           step="0.01"
+                           oninput="updateX50Bet()">
+                </div>
+                
+                <div class="amount-buttons">
+                    <button class="amount-btn" onclick="setX50MinBet()">Min</button>
+                    <button class="amount-btn" onclick="setX50MaxBet()">Max</button>
+                </div>
+            </div>
+
+            <!-- Кнопки множителей -->
+            <div class="x50-multiplier-buttons">
+                <button class="x50-multiplier-btn gray" onclick="placeX50Bet(2)">
+                    <span class="multiplier-label">x2</span>
+                    <span class="multiplier-chance">48% шанс</span>
+                </button>
+                <button class="x50-multiplier-btn yellow" onclick="placeX50Bet(3)">
+                    <span class="multiplier-label">x3</span>
+                    <span class="multiplier-chance">32% шанс</span>
+                </button>
+                <button class="x50-multiplier-btn red" onclick="placeX50Bet(5)">
+                    <span class="multiplier-label">x5</span>
+                    <span class="multiplier-chance">19% шанс</span>
+                </button>
+                <button class="x50-multiplier-btn green" onclick="placeX50Bet(50)">
+                    <span class="multiplier-label">x50</span>
+                    <span class="multiplier-chance">0.2% шанс</span>
+                </button>
+            </div>
+
+            <!-- Ставки игроков -->
+            <div class="x50-bets-container">
+                <div class="x50-bets-column">
+                    <div class="x50-bets-header">
+                        <span class="x50-bets-title">x2 (48%)</span>
+                        <span class="x50-bets-total" id="x2Total">0$</span>
+                    </div>
+                    <div class="x50-bets-list" id="x2Bets">
+                        <div class="empty-bets">Нет ставок</div>
+                    </div>
+                </div>
+                
+                <div class="x50-bets-column">
+                    <div class="x50-bets-header">
+                        <span class="x50-bets-title">x3 (32%)</span>
+                        <span class="x50-bets-total" id="x3Total">0$</span>
+                    </div>
+                    <div class="x50-bets-list" id="x3Bets">
+                        <div class="empty-bets">Нет ставок</div>
+                    </div>
+                </div>
+                
+                <div class="x50-bets-column">
+                    <div class="x50-bets-header">
+                        <span class="x50-bets-title">x5 (19%)</span>
+                        <span class="x50-bets-total" id="x5Total">0$</span>
+                    </div>
+                    <div class="x50-bets-list" id="x5Bets">
+                        <div class="empty-bets">Нет ставок</div>
+                    </div>
+                </div>
+                
+                <div class="x50-bets-column">
+                    <div class="x50-bets-header">
+                        <span class="x50-bets-title">x50 (0.2%)</span>
+                        <span class="x50-bets-total" id="x50Total">0$</span>
+                    </div>
+                    <div class="x50-bets-list" id="x50Bets">
+                        <div class="empty-bets">Нет ставок</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Страница игры Crash -->
+    <div class="main-content" id="crashPage">
+        <div class="game-header">
+            <button class="back-button" onclick="backToMain()">
+                <i class="fas fa-arrow-left"></i> Назад
+            </button>
+            <div class="game-title">Crash</div>
+        </div>
+        
+        <div class="crash-game-container">
+            <!-- График -->
+            <div class="crash-graph-container">
+                <canvas id="crashCanvas" width="800" height="300"></canvas>
+                <div class="crash-multiplier-display" id="crashMultiplier">
+                    1.00x
+                </div>
+                <div class="crash-timer" id="crashTimer">
+                    5
+                </div>
+            </div>
+
+            <!-- Управление ставкой -->
+            <div class="crash-controls">
+                <div class="crash-bet-control">
+                    <div class="crash-bet-label">Сумма ставки</div>
+                    <div class="amount-input-group">
+                        <div class="currency-symbol">$</div>
+                        <input type="number" 
+                               class="amount-input" 
+                               id="crashBetAmount"
+                               value="0.05"
+                               min="0.05"
+                               step="0.01"
+                               oninput="updateCrashBet()">
+                    </div>
+                    
+                    <div class="amount-buttons">
+                        <button class="amount-btn" onclick="setCrashMinBet()">Min</button>
+                        <button class="amount-btn" onclick="setCrashMaxBet()">Max</button>
+                    </div>
+                </div>
+
+                <div class="crash-auto-cashout">
+                    <div class="crash-auto-label">Автокэшаут (опционально)</div>
+                    <input type="number" 
+                           class="crash-auto-input" 
+                           id="crashAutoCashout"
+                           placeholder="Например: 2.00"
+                           step="0.01">
+                </div>
+
+                <!-- Кнопки действий -->
+                <div class="crash-action-buttons">
+                    <button class="crash-bet-btn" id="crashBetBtn" onclick="placeCrashBet()">
+                        Сделать ставку
+                    </button>
+                    <button class="crash-cashout-btn" id="crashCashoutBtn" onclick="cashoutCrash()" style="display: none;">
+                        Забрать <span id="crashCashoutAmount">0.00$</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- История ставок -->
+            <div class="crash-bets-container">
+                <div class="crash-bets-header">
+                    <span>Последние ставки</span>
+                </div>
+                <div class="crash-bets-list" id="crashBetsList">
+                    <!-- Ставки будут здесь -->
+                </div>
+            </div>
+
+            <!-- История игр -->
+            <div class="crash-history-container">
+                <div class="crash-history-header">
+                    <span>История крашей</span>
+                </div>
+                <div class="crash-history-list" id="crashHistory">
+                    <!-- История будет здесь -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Страница бонусов -->
+    <div class="main-content" id="bonusPage">
+        <div class="game-header">
+            <button class="back-button" onclick="backToMain()">
+                <i class="fas fa-arrow-left"></i> Назад
+            </button>
+            <div class="game-title">Бонусы</div>
+        </div>
+        
+        <div class="bonus-container">
+            <div class="bonus-card">
+                <div class="bonus-icon">
+                    <i class="fas fa-gift"></i>
+                </div>
+                <div class="bonus-content">
+                    <h3>Ежедневный бонус</h3>
+                    <p>Получайте бонус каждый день при балансе менее 0.05$</p>
+                    <button class="game-button" id="dailyBonusBtn" onclick="claimDailyBonus()">
+                        Получить бонус
+                    </button>
+                </div>
+            </div>
+            
+            <div class="bonus-card">
+                <div class="bonus-icon">
+                    <i class="fas fa-tag"></i>
+                </div>
+                <div class="bonus-content">
+                    <h3>Активация промокода</h3>
+                    <p>Введите промокод для получения бонуса</p>
+                    <div class="promo-input-group">
+                        <input type="text" 
+                               id="promoCode" 
+                               placeholder="Введите промокод"
+                               class="promo-input">
+                        <button class="promo-button" onclick="activatePromo()">
+                            Активировать
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Страница профиля -->
+    <div class="main-content" id="profilePage">
+        <div class="game-header">
+            <button class="back-button" onclick="backToMain()">
+                <i class="fas fa-arrow-left"></i> Назад
+            </button>
+            <div class="game-title">Профиль</div>
+        </div>
+        
+        <div class="profile-container">
+            <div class="profile-card">
+                <div class="profile-avatar-large" id="profileAvatarLarge">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="profile-info-large">
+                    <h3 id="profileName">Игрок</h3>
+                    <p id="profileUsername">@username</p>
+                </div>
+            </div>
+            
+            <div class="stats-container">
+                <div class="stats-title">Статистика</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalBets">0</div>
+                        <div class="stat-label">Всего ставок</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="wonBets">0</div>
+                        <div class="stat-label">Выиграно ставок</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalWin">0.00$</div>
+                        <div class="stat-label">Общий выигрыш</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="winRate">0%</div>
+                        <div class="stat-label">Процент побед</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script src="app.js"></script>
+</body>
+</html>
